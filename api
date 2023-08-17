@@ -1,0 +1,232 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+class Json_Autofetch extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Autocomplete Example',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: AutocompleteExample(),
+    );
+  }
+}
+
+class Airport {
+  final String iata;
+  final String name;
+  final String city;
+  final String state;
+  final String country;
+
+  Airport({
+    required this.iata,
+    required this.name,
+    required this.city,
+    required this.state,
+    required this.country,
+  });
+
+  factory Airport.fromJson(Map<String, dynamic> json) {
+    return Airport(
+      iata: json['iata'] ?? '',
+      name: json['name'] ?? '',
+      city: json['city'] ?? '',
+      state: json['state'] ?? '',
+      country: json['country'] ?? '',
+    );
+  }
+
+  @override
+  String toString() {
+    return '$iata, $name, $city, $state, $country';
+  }
+}
+
+class AutocompleteExample extends StatefulWidget {
+  @override
+  _AutocompleteExampleState createState() => _AutocompleteExampleState();
+}
+
+class _AutocompleteExampleState extends State<AutocompleteExample> {
+  final TextEditingController _fromTextEditingController =
+      TextEditingController();
+  final TextEditingController _toTextEditingController =
+      TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Autocomplete Example'),
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TypeAheadField<Airport>(
+              textFieldConfiguration: TextFieldConfiguration(
+                controller: _fromTextEditingController,
+                decoration: InputDecoration(
+                  labelText: 'From ?',
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      Icons.flight_takeoff,
+                      color: Colors.blue[500],
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide:
+                        BorderSide(width: 0.8, color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  border: OutlineInputBorder(
+                    borderSide:
+                        BorderSide(width: 0.8, color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide:
+                        BorderSide(width: 0.8, color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+              ),
+              suggestionsCallback: (pattern) async {
+                return _fetchSuggestions(pattern);
+              },
+              itemBuilder: (context, Airport suggestion) {
+                return ListTile(
+                  title: Text(suggestion.toString()),
+                );
+              },
+              onSuggestionSelected: (Airport suggestion) {
+                _selectSuggestion(suggestion, isFromField: true);
+              },
+            ),
+            SizedBox(height: 16),
+            TypeAheadField<Airport>(
+              textFieldConfiguration: TextFieldConfiguration(
+                controller: _toTextEditingController,
+                decoration: InputDecoration(
+                  labelText: 'To ?',
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      Icons.flight_land,
+                      color: Colors.blue[500],
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide:
+                        BorderSide(width: 0.8, color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  border: OutlineInputBorder(
+                    borderSide:
+                        BorderSide(width: 0.8, color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide:
+                        BorderSide(width: 0.8, color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+              ),
+              suggestionsCallback: (pattern) async {
+                return _fetchSuggestions(pattern);
+              },
+              itemBuilder: (context, Airport suggestion) {
+                return ListTile(
+                  title: Text(suggestion.toString()),
+                );
+              },
+              onSuggestionSelected: (Airport suggestion) {
+                _selectSuggestion(suggestion, isFromField: false);
+              },
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                final String fromIataCode = _fromTextEditingController.text
+                    .split('(')[1]
+                    .replaceAll(')', '');
+                final String toIataCode = _toTextEditingController.text
+                    .split('(')[1]
+                    .replaceAll(')', '');
+                final url =
+                    'https://example.com/$fromIataCode-$toIataCode'; // Replace with your desired URL
+                _launchURL(url);
+              },
+              child: Text('Search'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<List<Airport>> _fetchSuggestions(String pattern) async {
+    final response = await http.get(
+      Uri.parse(
+          'https://raw.githubusercontent.com/mwgg/Airports/master/airports.json'),
+    );
+
+    if (response.statusCode == 200) {
+      final dynamic jsonData = json.decode(response.body);
+      final List<Airport> suggestions = [];
+
+      if (jsonData is List<dynamic>) {
+        final List<dynamic> data = jsonData;
+        for (final item in data) {
+          final airport = Airport.fromJson(item);
+          if (airport.city.toLowerCase().contains(pattern.toLowerCase()) ||
+              airport.iata.toLowerCase().contains(pattern.toLowerCase())) {
+            suggestions.add(airport);
+          }
+        }
+      } else if (jsonData is Map<String, dynamic>) {
+        final Map<String, dynamic> data = jsonData;
+        data.values.forEach((item) {
+          final airport = Airport.fromJson(item);
+          if (airport.city.toLowerCase().contains(pattern.toLowerCase()) ||
+              airport.iata.toLowerCase().contains(pattern.toLowerCase())) {
+            suggestions.add(airport);
+          }
+        });
+      }
+
+      return suggestions;
+    } else {
+      throw Exception('Failed to fetch suggestions');
+    }
+  }
+
+  void _selectSuggestion(Airport selectedAirport, {required bool isFromField}) {
+    final TextEditingController textEditingController =
+        isFromField ? _fromTextEditingController : _toTextEditingController;
+
+    setState(() {
+      textEditingController.text =
+          '${selectedAirport.city} (${selectedAirport.iata})';
+    });
+  }
+
+  void _launchURL(String url) async {
+    // ignore: deprecated_member_use
+    if (await canLaunch(url)) {
+      // ignore: deprecated_member_use
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+}
