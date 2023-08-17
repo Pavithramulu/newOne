@@ -1,0 +1,148 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:table_calendar/table_calendar.dart';
+
+// void main() {
+//   runApp(const MyApp());
+// }
+
+class FlightFare {
+  final String from;
+  final String to;
+  final double fare;
+
+  FlightFare({required this.from, required this.to, required this.fare});
+
+  factory FlightFare.fromJson(Map<String, dynamic> json) {
+    return FlightFare(
+      from: json['from'],
+      to: json['to'],
+      fare: json['fare'].toDouble(),
+    );
+  }
+}
+
+class RapidAPI extends StatelessWidget {
+  const RapidAPI({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flight Fare Search',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const FlightFareSearchPage(),
+    );
+  }
+}
+
+class FlightFareSearchPage extends StatefulWidget {
+  const FlightFareSearchPage({Key? key}) : super(key: key);
+
+  @override
+  _FlightFareSearchPageState createState() => _FlightFareSearchPageState();
+}
+
+class _FlightFareSearchPageState extends State<FlightFareSearchPage> {
+  final TextEditingController _fromController = TextEditingController();
+  final TextEditingController _toController = TextEditingController();
+  String _fareResult = '';
+
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _selectedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+
+
+  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
+    setState(() {
+      _selectedDay = selectedDay;
+      _focusedDay = focusedDay;
+    });
+  }
+
+  Future<void> _searchFlightFare() async {
+    final String from = _fromController.text;
+    final String to = _toController.text;
+
+    final url = Uri.parse(
+        'https://farish978-flight-fare-search.p.rapidapi.com/api/flightfare/$from/$to');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'X-RapidAPI-Key': '49abbe3c79msh8a8d6277caf77b5p13b7d8jsned0aa8e49f03',
+        'X-RapidAPI-Host': 'farish978-flight-fare-search.p.rapidapi.com',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      final flightFare = FlightFare.fromJson(responseData);
+
+      setState(() {
+        _fareResult =
+            'From: ${flightFare.from}\nTo: ${flightFare.to}\nFare: ${flightFare.fare}';
+      });
+    } else {
+      setState(() {
+        _fareResult =
+            'Failed to fetch flight fare. Error: ${response.statusCode}';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Flight Fare Search'),
+      ),
+      body: Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextFormField(
+              controller: _fromController,
+              decoration: const InputDecoration(labelText: 'From'),
+            ),
+            TextFormField(
+              controller: _toController,
+              decoration: const InputDecoration(labelText: 'To'),
+            ),
+            const SizedBox(height: 16.0),
+            Expanded(
+              child: TableCalendar(
+                firstDay: DateTime.utc(2022, 1, 1),
+                lastDay: DateTime.utc(2022, 12, 31),
+                focusedDay: _focusedDay,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                calendarFormat: _calendarFormat,
+                onDaySelected: _onDaySelected,
+                onPageChanged: (focusedDay) {
+                  _focusedDay = focusedDay;
+                },
+              ),
+            ),
+            const SizedBox(height: 16.0),
+            ElevatedButton(
+              onPressed: _searchFlightFare,
+              child: const Text('Search'),
+            ),
+            const SizedBox(height: 16.0),
+            Text(
+              'Selected Date: ${_selectedDay.toIso8601String().split('T')[0]}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16.0),
+            Text(
+              _fareResult,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
